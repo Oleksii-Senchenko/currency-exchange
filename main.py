@@ -28,6 +28,8 @@ def get_currency():
     with open("currency_rates.json", "w", encoding="utf-8") as file:
         json.dump(rates, file, indent=4)
 
-
+def get_wanted_sum_and_curr(ammount):
+    integer, curr = ammount.split(",")
+    return int(integer), curr
 
 bot.polling()
