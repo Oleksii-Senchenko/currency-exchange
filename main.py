@@ -37,4 +37,42 @@ def get_wanted_sum_and_curr(ammount):
 amount_to_convert, curr_to_convert = get_wanted_sum_and_curr("90,EUR")
 
 
+def covert_to(curr):
+    with open("currency_codes.json", "r", encoding="utf-8") as file:
+        codes_curr = json.load(file)
+
+        source_curr_code = codes_curr[curr_to_convert]
+        target_curr_code = codes_curr[curr.strip().upper()]
+
+    with open("currency_rates.json", "r", encoding="utf-8") as file:
+        curr_rates = json.load(file)
+    found = False
+
+    for i in curr_rates:
+        if i["currencyCodeA"] == source_curr_code and i["currencyCodeB"] == target_curr_code:
+            rate = i.get("rateBuy") or i.get("rateCross") or i.get("rateSell")
+            if rate:
+                result = amount_to_convert * rate
+                print(f"{amount_to_convert} {curr_to_convert} = {result:.2f} {curr}")
+                found = True
+                break
+
+
+
+
+
+        elif i["currencyCodeA"] == target_curr_code and i["currencyCodeB"] == source_curr_code:
+            rate = i.get("rateSell") or i.get("rateCross") or i.get("rateBuy")
+            if rate:
+                result = amount_to_convert / rate
+                print(f"{amount_to_convert} {curr_to_convert} = {result:.2f} {curr}")
+                found = True
+                break
+
+    if not found:
+        print("Пара валют не найдена.")
+
+
+covert_to("KZT")
+
 bot.polling()
