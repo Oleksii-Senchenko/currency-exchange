@@ -32,4 +32,9 @@ def get_wanted_sum_and_curr(ammount):
     integer, curr = ammount.split(",")
     return int(integer), curr
 
+
+
+amount_to_convert, curr_to_convert = get_wanted_sum_and_curr("90,EUR")
+
+
 bot.polling()
