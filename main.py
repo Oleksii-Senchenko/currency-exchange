@@ -72,7 +72,6 @@ def covert_to(curr):
     if not found:
         print("Пара валют не найдена.")
 
-
 covert_to("KZT")
 
 bot.polling()
