@@ -16,6 +16,24 @@ sum_from = None
 curr_from = None
 
 
+
+def save_conversion_request(request_data):
+    history = []
+    if os.path.exists("history.json"):
+        with open("history.json", "r", encoding="utf-8") as file:
+            try:
+                history = json.load(file)
+            except json.JSONDecodeError:
+                history = []
+
+    history.append(request_data)
+    history = history[-10:]
+
+    with open("history.json", "w", encoding="utf-8") as file:
+        json.dump(history, file, indent=4)
+
+
+
 @bot.message_handler(commands=["start"])
 def start_handler(message: telebot.types.Message):
     return bot.send_message(message.chat.id,
@@ -29,10 +47,15 @@ def help_handler(message: telebot.types.Message):
 
 
 def get_currency():
-    rates = requests.get("https://api.monobank.ua/bank/currency").json()
-    with open("currency_rates.json", "w", encoding="utf-8") as file:
-        json.dump(rates, file, indent=4)
-
+    response = requests.get("https://api.monobank.ua/bank/currency")
+    if response.status_code == 200:
+        try:
+            rates = response.json()
+        except ValueError as e:
+            print(e)
+            return
+        with open("currency_rates.json", "w", encoding="utf-8") as file:
+            json.dump(rates, file, indent=4)
 
 
 
@@ -67,13 +90,12 @@ def get_wanted_sum_and_curr(message: telebot.types.Message):
         )
 
     sum_from = int(parts[0])
-    curr_from = parts[1]
+    curr_from = parts[1].upper()
 
     return bot.send_message(
         message.chat.id,
         f"Saved: {sum_from} {curr_from}"
     )
-
 
 
 
@@ -94,6 +116,10 @@ def calculate_to_required_curr(message: telebot.types.Message):
             curr_rates = json.load(file)
 
         found = False
+        buy = sell = cross = None
+
+
+
         for i in curr_rates:
             if i["currencyCodeA"] == source_curr_code and i["currencyCodeB"] == target_curr_code:
                 buy = i.get("rateBuy")
@@ -103,25 +129,42 @@ def calculate_to_required_curr(message: telebot.types.Message):
                 break
 
             elif i["currencyCodeA"] == target_curr_code and i["currencyCodeB"] == source_curr_code:
-                buy = i.get("rateSell")
-                sell = i.get("rateBuy")
-                cross = i.get("rateCross")
+                orig_buy = i.get("rateBuy")
+                orig_sell = i.get("rateSell")
+                orig_cross = i.get("rateCross")
+
+                buy = 1 / orig_sell if orig_sell else None
+                sell = 1 / orig_buy if orig_buy else None
+                cross = 1 / orig_cross if orig_cross else None
                 found = True
                 break
+
 
         if not found:
             return bot.send_message(message.chat.id, failed_to_find)
 
         reply = f"💱 Exchange {sum_from} {curr_from} to {curr_to_convert}:\n"
-        if buy:
+        if buy is not None:
             converted_buy = sum_from * buy
-            reply += f"🔻 Sell ({buy:.2f}): {converted_buy:.2f} {curr_to_convert}\n"
-        if sell:
+            reply += f"🔻 Sell ({buy:.4f}): {converted_buy:.2f} {curr_to_convert}\n"
+
+
+        if sell is not None:
             converted_sell = sum_from * sell
-            reply += f"🔺 Buy ({sell:.2f}): {converted_sell:.2f} {curr_to_convert}\n"
-        if not buy and not sell and cross:
+            reply += f"🔺 Buy ({sell:.4f}): {converted_sell:.2f} {curr_to_convert}\n"
+
+
+        if buy is None and sell is None and cross is not None:
             converted_cross = sum_from * cross
-            reply += f"🔄 Cross rate ({cross:.2f}): {converted_cross:.2f} {curr_to_convert}"
+            reply += f"🔄 Cross rate ({cross:.4f}): {converted_cross:.2f} {curr_to_convert}"
+
+        save_conversion_request({
+            "from_amount": sum_from,
+            "from_currency": curr_from,
+            "to_currency": curr_to_convert,
+            "result": reply,
+            "timestamp": message.date
+        })
 
         return bot.send_message(message.chat.id, reply)
 
@@ -131,6 +174,5 @@ def calculate_to_required_curr(message: telebot.types.Message):
     except Exception as e:
         print(e)
         return bot.send_message(message.chat.id, wrong_calculation)
-
 
 bot.polling()
